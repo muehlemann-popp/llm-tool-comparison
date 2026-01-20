@@ -4,7 +4,7 @@ import time
 from typing import List
 from haystack.dataclasses import ChatMessage
 from haystack.utils import Secret
-from haystack_integrations.components.generators.google_ai import GoogleAIGeminiChatGenerator
+from haystack_integrations.components.generators.google_genai import GoogleGenAIChatGenerator
 
 from .base import ModelProvider, ConversationResult, ToolCall
 from ..config.settings import settings
@@ -36,10 +36,10 @@ class GoogleHaystackProvider(ModelProvider):
         }
         actual_model = model_mapping.get(self.model_name, self.model_name)
 
-        generator = GoogleAIGeminiChatGenerator(
+        generator = GoogleGenAIChatGenerator(
             api_key=Secret.from_token(settings.google_api_key),
             model=actual_model,
-            generation_config={"temperature": 0.7},
+            generation_kwargs={"temperature": 0.7},
             tools=self.tools,
         )
 
