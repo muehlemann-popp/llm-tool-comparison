@@ -12,14 +12,14 @@ from ..pipelines.builder import build_tool_calling_pipeline, has_tool_calls, ext
 from ..tools import get_all_tools
 
 
-class GoogleProvider(ModelProvider):
+class GoogleHaystackProvider(ModelProvider):
     """Provider for Google Gemini models using Haystack integration."""
 
     def __init__(self, model_name: str):
-        """Initialize Google provider.
+        """Initialize Google Haystack provider.
 
         Args:
-            model_name: Gemini model name (e.g., "gemini-3-flash", "gemini-3-pro")
+            model_name: Gemini model name (e.g., "gemini-haystack-flash", "gemini-haystack-pro")
         """
         self.model_name = model_name
         self.tools = get_all_tools()
@@ -31,8 +31,8 @@ class GoogleProvider(ModelProvider):
         """Create Haystack pipeline with Google Gemini generator and tools."""
         # Map friendly names to actual model names
         model_mapping = {
-            "gemini-3-flash": "gemini-2.0-flash",
-            "gemini-3-pro": "gemini-2.0-flash",  # Using flash as fallback if pro not available
+            "gemini-haystack-flash": "gemini-3-flash-preview",
+            "gemini-haystack-pro": "gemini-3-pro-preview",
         }
         actual_model = model_mapping.get(self.model_name, self.model_name)
 

@@ -7,7 +7,8 @@ from openinference.instrumentation.haystack import HaystackInstrumentor
 
 from .config.settings import settings
 from .providers.openai_provider import OpenAIProvider
-from .providers.google_provider import GoogleProvider
+from .providers.google_native_provider import GoogleNativeProvider
+from .providers.google_haystack_provider import GoogleHaystackProvider
 from .providers.judge_provider import JudgeProvider
 from .display.logger import ConversationLogger
 from .scenarios.travel import TRAVEL_QUERY, TRAVEL_SCENARIO_DESCRIPTION
@@ -27,10 +28,10 @@ if settings.langfuse_enabled:
 @app.command()
 def compare(
     models: List[str] = typer.Option(
-        ["gpt-4.1", "gpt-5.2", "gemini-3-flash", "gemini-3-pro"],
+        ["gpt-4.1", "gemini-native-flash", "gemini-haystack-flash"],
         "--model",
         "-m",
-        help="Models to compare (can be specified multiple times)"
+        help="Models to compare. Gemini variants: gemini-native-flash, gemini-native-pro (native SDK), gemini-haystack-flash, gemini-haystack-pro (Haystack)"
     ),
     show_scenario: bool = typer.Option(
         False,
@@ -83,10 +84,12 @@ def compare(
             # Create provider based on model name
             if model_name.startswith("gpt"):
                 provider = OpenAIProvider(model_name)
-            elif model_name.startswith("gemini"):
-                provider = GoogleProvider(model_name)
+            elif model_name.startswith("gemini-native"):
+                provider = GoogleNativeProvider(model_name)
+            elif model_name.startswith("gemini-haystack"):
+                provider = GoogleHaystackProvider(model_name)
             else:
-                logger.show_error(f"Unknown model type: {model_name}")
+                logger.show_error(f"Unknown model type: {model_name}. Use gemini-native-* or gemini-haystack-* for Gemini models.")
                 continue
 
             # Display header
@@ -151,8 +154,10 @@ def info():
     models_info = [
         ("gpt-4.1", "OpenAI GPT-4.1", "High performance, general purpose"),
         ("gpt-5.2", "OpenAI GPT-5.2", "Latest GPT model"),
-        ("gemini-3-flash", "Google Gemini 2.0 Flash", "Fast, efficient"),
-        ("gemini-3-pro", "Google Gemini 2.0 Pro", "High quality responses"),
+        ("gemini-native-flash", "Gemini 3 Flash (native)", "Native google-genai SDK"),
+        ("gemini-native-pro", "Gemini 3 Pro (native)", "Native google-genai SDK"),
+        ("gemini-haystack-flash", "Gemini 3 Flash (Haystack)", "Via Haystack integration"),
+        ("gemini-haystack-pro", "Gemini 3 Pro (Haystack)", "Via Haystack integration"),
     ]
 
     for model_id, display_name, description in models_info:
