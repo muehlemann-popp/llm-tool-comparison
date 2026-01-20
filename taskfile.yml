@@ -1,0 +1,30 @@
+version: '3'
+
+tasks:
+  setup:
+    desc: Set up project with uv
+    cmds:
+      - uv venv
+      - uv pip install --python .venv/bin/python -e .
+      - cp .env.example .env
+      - echo "✓ Setup complete! Edit .env with your API keys"
+
+  run:
+    desc: Run the comparison
+    cmds:
+      - .venv/bin/python -m llm_tool_comparison.main compare
+
+  test-connection:
+    desc: Test API connections
+    cmds:
+      - .venv/bin/python -m llm_tool_comparison.main test-connection
+
+  info:
+    desc: Show available models and tools
+    cmds:
+      - .venv/bin/python -m llm_tool_comparison.main info
+
+  clean:
+    desc: Clean up
+    cmds:
+      - rm -rf .venv __pycache__ *.egg-info
