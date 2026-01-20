@@ -18,5 +18,9 @@ class Settings(BaseSettings):
     openai_api_key: str
     google_api_key: str
 
+    # Judge settings
+    judge_enabled: bool = True
+    judge_model: str = "gpt-4.1"
+
 
 settings = Settings()

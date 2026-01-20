@@ -139,6 +139,9 @@ class ConversationLogger:
         table.add_row("Duration", f"{result.total_duration:.2f}s")
         table.add_row("Tool Calls", str(len(result.tool_calls_made)))
 
+        if result.judge_score > 0:
+            table.add_row("Judge Score", f"{result.judge_score:.0f}/100")
+
         if not result.success and result.error_message:
             table.add_row("Error", result.error_message)
 
@@ -168,24 +171,61 @@ class ConversationLogger:
         table.add_column("Success", justify="center")
         table.add_column("Tool Calls", justify="right")
         table.add_column("Duration (s)", justify="right")
-        table.add_column("Avg per Call (s)", justify="right")
+        table.add_column("Judge Score", justify="right")
 
         for result in results:
             success_icon = "✓" if result.success else "✗"
             success_style = "green" if result.success else "red"
 
             tool_count = len(result.tool_calls_made)
-            avg_time = result.total_duration / max(tool_count, 1)
+
+            # Format judge score with color coding
+            if result.judge_score >= 80:
+                score_str = f"[green]{result.judge_score:.0f}[/green]"
+            elif result.judge_score >= 60:
+                score_str = f"[yellow]{result.judge_score:.0f}[/yellow]"
+            elif result.judge_score > 0:
+                score_str = f"[red]{result.judge_score:.0f}[/red]"
+            else:
+                score_str = "-"
 
             table.add_row(
                 result.model_name,
                 f"[{success_style}]{success_icon}[/{success_style}]",
                 str(tool_count),
                 f"{result.total_duration:.2f}",
-                f"{avg_time:.2f}"
+                score_str
             )
 
         self.console.print(table)
+        self.console.print()
+
+    def show_judge_evaluation(self, result: ConversationResult):
+        """Display detailed judge evaluation feedback.
+
+        Args:
+            result: ConversationResult with judge evaluation
+        """
+        if not result.judge_evaluation:
+            return
+
+        # Determine color based on score
+        if result.judge_score >= 80:
+            border_style = "green"
+            title_style = "bold green"
+        elif result.judge_score >= 60:
+            border_style = "yellow"
+            title_style = "bold yellow"
+        else:
+            border_style = "red"
+            title_style = "bold red"
+
+        self.console.print(Panel(
+            result.judge_evaluation,
+            title=f"[{title_style}]Judge Evaluation ({result.judge_score:.0f}/100)[/{title_style}]",
+            border_style=border_style,
+            padding=(1, 2)
+        ))
         self.console.print()
 
     def show_error(self, message: str):

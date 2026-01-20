@@ -25,6 +25,8 @@ class ConversationResult:
         total_duration: Total time taken in seconds
         success: Whether the conversation completed successfully
         error_message: Error message if success is False
+        judge_score: Overall quality score from judge (0-100)
+        judge_evaluation: Detailed feedback from judge
     """
 
     model_name: str
@@ -33,6 +35,8 @@ class ConversationResult:
     total_duration: float = 0.0
     success: bool = True
     error_message: str = ""
+    judge_score: float = 0.0
+    judge_evaluation: str = ""
 
 
 class ModelProvider(ABC):

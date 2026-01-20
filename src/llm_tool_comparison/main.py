@@ -8,8 +8,10 @@ from openinference.instrumentation.haystack import HaystackInstrumentor
 from .config.settings import settings
 from .providers.openai_provider import OpenAIProvider
 from .providers.google_provider import GoogleProvider
+from .providers.judge_provider import JudgeProvider
 from .display.logger import ConversationLogger
 from .scenarios.travel import TRAVEL_QUERY, TRAVEL_SCENARIO_DESCRIPTION
+from .tools import get_all_tools
 
 app = typer.Typer(
     name="llm-tool-comparison",
@@ -94,10 +96,23 @@ def compare(
             # Run conversation
             result = provider.run_conversation(TRAVEL_QUERY)
 
+            # Judge evaluation
+            if settings.judge_enabled and result.success:
+                judge = JudgeProvider(model_name=settings.judge_model)
+                result = judge.evaluate_response(
+                    result,
+                    TRAVEL_QUERY,
+                    get_all_tools()
+                )
+
             # Display results
             logger.show_tool_calls(result.tool_calls_made)
             logger.show_final_response(result.final_response)
             logger.show_summary(result)
+
+            # Show judge evaluation if available
+            if result.judge_evaluation:
+                logger.show_judge_evaluation(result)
 
             results.append(result)
 
