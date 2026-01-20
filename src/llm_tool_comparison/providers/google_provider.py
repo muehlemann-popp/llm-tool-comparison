@@ -1,45 +1,49 @@
-"""Google Gemini model provider implementation using google-genai SDK."""
+"""Google Gemini model provider implementation using Haystack integration."""
 
 import time
 from typing import List
-from google import genai
-from google.genai import types
+from haystack.dataclasses import ChatMessage
+from haystack.utils import Secret
+from haystack_integrations.components.generators.google_ai import GoogleAIGeminiChatGenerator
 
 from .base import ModelProvider, ConversationResult, ToolCall
 from ..config.settings import settings
+from ..pipelines.builder import build_tool_calling_pipeline, has_tool_calls, extract_text_content, get_tool_calls_from_message
 from ..tools import get_all_tools
 
 
 class GoogleProvider(ModelProvider):
-    """Provider for Google Gemini models using the new google-genai SDK."""
+    """Provider for Google Gemini models using Haystack integration."""
 
     def __init__(self, model_name: str):
         """Initialize Google provider.
 
         Args:
-            model_name: Gemini model name (e.g., "gemini-3-flash-preview", "gemini-3-pro-preview")
+            model_name: Gemini model name (e.g., "gemini-3-flash", "gemini-3-pro")
         """
         self.model_name = model_name
         self.tools = get_all_tools()
-        self.client = genai.Client(api_key=settings.google_api_key)
-        self._tool_functions = self._build_tool_functions()
-        self._tool_declarations = self._build_tool_declarations()
+        components = self._create_pipeline()
+        self.pipeline = components.pipeline
+        self.tool_invoker = components.tool_invoker
 
-    def _build_tool_functions(self) -> dict:
-        """Build a mapping of tool names to their functions."""
-        return {tool.name: tool.function for tool in self.tools}
+    def _create_pipeline(self):
+        """Create Haystack pipeline with Google Gemini generator and tools."""
+        # Map friendly names to actual model names
+        model_mapping = {
+            "gemini-3-flash": "gemini-2.0-flash",
+            "gemini-3-pro": "gemini-2.0-flash",  # Using flash as fallback if pro not available
+        }
+        actual_model = model_mapping.get(self.model_name, self.model_name)
 
-    def _build_tool_declarations(self) -> types.Tool:
-        """Build tool declarations for the Gemini API."""
-        function_declarations = []
-        for tool in self.tools:
-            func_decl = types.FunctionDeclaration(
-                name=tool.name,
-                description=tool.description,
-                parameters=tool.parameters
-            )
-            function_declarations.append(func_decl)
-        return types.Tool(function_declarations=function_declarations)
+        generator = GoogleAIGeminiChatGenerator(
+            api_key=Secret.from_token(settings.google_api_key),
+            model=actual_model,
+            generation_config={"temperature": 0.7},
+            tools=self.tools,
+        )
+
+        return build_tool_calling_pipeline(generator, self.tools)
 
     def get_model_name(self) -> str:
         """Get the model name."""
@@ -55,88 +59,63 @@ class GoogleProvider(ModelProvider):
             ConversationResult with final response and metadata
         """
         start_time = time.time()
+        messages = [ChatMessage.from_user(query)]
         tool_calls_made: List[ToolCall] = []
-
-        # Map friendly names to actual model names
-        model_mapping = {
-            "gemini-3-flash": "gemini-3-flash-preview",
-            "gemini-3-pro": "gemini-3-pro-preview",
-        }
-        actual_model = model_mapping.get(self.model_name, self.model_name)
 
         max_iterations = 10
         iteration = 0
-
-        # Build contents for conversation
-        contents = [
-            types.Content(
-                role='user',
-                parts=[types.Part.from_text(text=query)]
-            )
-        ]
 
         try:
             while iteration < max_iterations:
                 iteration += 1
 
-                # Generate content with tools
-                response = self.client.models.generate_content(
-                    model=actual_model,
-                    contents=contents,
-                    config=types.GenerateContentConfig(
-                        tools=[self._tool_declarations],
-                        temperature=0.7,
-                    ),
-                )
+                # Run generator only
+                result = self.pipeline.run({"generator": {"messages": messages}})
 
-                # Check if there are function calls
-                if response.function_calls:
-                    # Process each function call
-                    function_response_parts = []
+                # Get the reply from generator
+                replies = result.get("generator", {}).get("replies", [])
+                if not replies:
+                    return ConversationResult(
+                        model_name=self.model_name,
+                        final_response="No response from generator",
+                        tool_calls_made=tool_calls_made,
+                        total_duration=time.time() - start_time,
+                        success=False,
+                        error_message="Empty replies from generator"
+                    )
 
-                    for fc in response.function_calls:
-                        tool_name = fc.name
-                        args = dict(fc.args) if fc.args else {}
+                reply = replies[0]
 
-                        # Record the tool call
+                # Check if tool calls were made
+                if has_tool_calls(reply):
+                    # Extract tool calls from the reply
+                    for tc in get_tool_calls_from_message(reply):
                         tool_calls_made.append(ToolCall(
-                            tool_name=tool_name,
-                            arguments=args,
+                            tool_name=getattr(tc, 'tool_name', 'unknown'),
+                            arguments=getattr(tc, 'arguments', {}),
                             result=None
                         ))
 
-                        # Execute the tool
-                        if tool_name in self._tool_functions:
-                            try:
-                                result = self._tool_functions[tool_name](**args)
-                                tool_calls_made[-1].result = result
-                            except Exception as e:
-                                result = f"Error executing tool: {str(e)}"
-                                tool_calls_made[-1].result = result
-                        else:
-                            result = f"Unknown tool: {tool_name}"
-                            tool_calls_made[-1].result = result
+                    # Add assistant message to conversation
+                    messages.append(reply)
 
-                        # Build function response part
-                        function_response_parts.append(
-                            types.Part.from_function_response(
-                                name=tool_name,
-                                response={'result': result}
-                            )
-                        )
+                    # Run tool invoker directly
+                    tool_result = self.tool_invoker.run(messages=[reply])
+                    tool_messages = tool_result.get("tool_messages", [])
 
-                    # Add model's response and tool results to conversation
-                    contents.append(response.candidates[0].content)
-                    contents.append(
-                        types.Content(
-                            role='user',
-                            parts=function_response_parts
-                        )
-                    )
+                    # Add tool results to conversation
+                    messages.extend(tool_messages)
+
+                    # Update tool call results
+                    for i, tool_msg in enumerate(tool_messages):
+                        if i < len(tool_calls_made) - len(tool_messages) + i + 1:
+                            idx = len(tool_calls_made) - len(tool_messages) + i
+                            if idx >= 0 and idx < len(tool_calls_made):
+                                tool_calls_made[idx].result = extract_text_content(tool_msg)
 
                 else:
-                    # No function calls - conversation complete
-                    final_response = response.text if response.text else ""
+                    # No tools called - conversation complete
+                    final_response = extract_text_content(reply)
 
                     return ConversationResult(
                         model_name=self.model_name,

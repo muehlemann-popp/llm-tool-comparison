@@ -4,7 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
     "haystack-ai>=2.9.0",
-    "google-genai>=1.0.0",
+    "google-ai-haystack>=2.0.0",
     "langfuse>=2.50.0",
     "openinference-instrumentation-haystack>=0.1.0",
     "typer>=0.12.0",
