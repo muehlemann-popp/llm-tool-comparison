@@ -3,6 +3,20 @@
 from haystack.tools import Tool
 from typing import Dict, List
 
+# Import new tools
+from .openweathermap import owm_daily_forecast
+from .hapimag import (
+    hapimag_get_resort_details,
+    hapimag_get_resort_apartments,
+    hapimag_get_charging_station_for_resort,
+    hapimag_get_resort_gastronomy_details,
+    hapimag_get_activities_overview,
+    hapimag_get_activities_details,
+    hapimag_get_resort_services,
+    hapimag_get_pet_charge,
+)
+from .maps import maps_search_nearby_places, maps_get_places_details
+
 
 # ============================================================================
 # WEATHER TOOL
@@ -223,14 +237,181 @@ def get_all_tools() -> List[Tool]:
             },
             function=get_transportation_info,
         ),
+        # OpenWeatherMap tools
+        Tool(
+            name="owm_daily_forecast",
+            description="Get daily weather forecast for a city for the next few days",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": "City name with country (e.g., 'Andeer, Switzerland')"},
+                    "days": {"type": "integer", "description": "Number of days to forecast (1-7)", "default": 7},
+                },
+                "required": ["city"],
+            },
+            function=owm_daily_forecast,
+        ),
+        # Hapimag resort tools
+        Tool(
+            name="hapimag_get_resort_details",
+            description="Get detailed information about a Hapimag resort including location, amenities, and description",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "resort_id": {"type": "integer", "description": "Unique resort identifier"},
+                    "locale": {"type": "string", "description": "Locale for response (e.g., 'en_GB')", "default": "en_GB"},
+                },
+                "required": ["resort_id"],
+            },
+            function=hapimag_get_resort_details,
+        ),
+        Tool(
+            name="hapimag_get_resort_apartments",
+            description="Get available apartments and accommodation options at a Hapimag resort",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "resort_id": {"type": "integer", "description": "Unique resort identifier"},
+                },
+                "required": ["resort_id"],
+            },
+            function=hapimag_get_resort_apartments,
+        ),
+        Tool(
+            name="hapimag_get_charging_station_for_resort",
+            description="Get EV charging station information for a resort including charger types and availability",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "resort_id": {"type": "integer", "description": "Unique resort identifier"},
+                },
+                "required": ["resort_id"],
+            },
+            function=hapimag_get_charging_station_for_resort,
+        ),
+        Tool(
+            name="hapimag_get_resort_gastronomy_details",
+            description="Get restaurant, bar, and dining information for a resort",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "resort_id": {"type": "integer", "description": "Unique resort identifier"},
+                    "locale": {"type": "string", "description": "Locale for response", "default": "en_GB"},
+                },
+                "required": ["resort_id"],
+            },
+            function=hapimag_get_resort_gastronomy_details,
+        ),
+        Tool(
+            name="hapimag_get_activities_overview",
+            description="Get overview of activities available at a resort during a specific date range",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "resort_id": {"type": "integer", "description": "Unique resort identifier"},
+                    "date_from": {"type": "string", "description": "Start date (e.g., '2026-02-02 16:00')"},
+                    "date_to": {"type": "string", "description": "End date (e.g., '2026-02-21 10:00')"},
+                    "locale": {"type": "string", "description": "Locale for response", "default": "en_GB"},
+                },
+                "required": ["resort_id", "date_from", "date_to"],
+            },
+            function=hapimag_get_activities_overview,
+        ),
+        Tool(
+            name="hapimag_get_activities_details",
+            description="Get detailed information about specific activities by their keys",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "keys": {"type": "array", "items": {"type": "string"}, "description": "List of activity keys (e.g., ['activity_id:123'])"},
+                    "date_from": {"type": "string", "description": "Start date"},
+                    "date_to": {"type": "string", "description": "End date"},
+                    "locale": {"type": "string", "description": "Locale for response", "default": "en_GB"},
+                },
+                "required": ["keys", "date_from", "date_to"],
+            },
+            function=hapimag_get_activities_details,
+        ),
+        Tool(
+            name="hapimag_get_resort_services",
+            description="Get services available at a resort such as reception, housekeeping, and shuttle",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "resort_id": {"type": "integer", "description": "Unique resort identifier"},
+                },
+                "required": ["resort_id"],
+            },
+            function=hapimag_get_resort_services,
+        ),
+        Tool(
+            name="hapimag_get_pet_charge",
+            description="Get pet policy and charges for a resort",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "resort_id": {"type": "integer", "description": "Unique resort identifier"},
+                },
+                "required": ["resort_id"],
+            },
+            function=hapimag_get_pet_charge,
+        ),
+        # Google Maps-style tools
+        Tool(
+            name="maps_search_nearby_places",
+            description="Search for places near a location (restaurants, gas stations, spas, ski rentals, etc.)",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string", "description": "Location as address or 'lat,lng' coordinates"},
+                    "place_type": {"type": "string", "description": "Type of place (restaurant, gas_station, spa, lodging, point_of_interest, supermarket, parking)"},
+                    "radius": {"type": "integer", "description": "Search radius in meters", "default": 5000},
+                    "keyword": {"type": "string", "description": "Optional keyword to filter results"},
+                    "lang_code": {"type": "string", "description": "Language code for results", "default": "en"},
+                    "min_price": {"type": "integer", "description": "Minimum price level (0-4)", "default": 0},
+                    "max_price": {"type": "integer", "description": "Maximum price level (0-4)", "default": 4},
+                },
+                "required": ["location", "place_type"],
+            },
+            function=maps_search_nearby_places,
+        ),
+        Tool(
+            name="maps_get_places_details",
+            description="Get detailed information about specific places by their place IDs",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "place_ids": {"type": "array", "items": {"type": "string"}, "description": "List of place IDs to get details for"},
+                    "lang_code": {"type": "string", "description": "Language code for results", "default": "en"},
+                },
+                "required": ["place_ids"],
+            },
+            function=maps_get_places_details,
+        ),
     ]
 
 
 __all__ = [
+    # Original tools
     "get_weather_forecast",
     "search_hotels",
     "find_attractions",
     "convert_currency",
     "get_transportation_info",
+    # OpenWeatherMap tools
+    "owm_daily_forecast",
+    # Hapimag resort tools
+    "hapimag_get_resort_details",
+    "hapimag_get_resort_apartments",
+    "hapimag_get_charging_station_for_resort",
+    "hapimag_get_resort_gastronomy_details",
+    "hapimag_get_activities_overview",
+    "hapimag_get_activities_details",
+    "hapimag_get_resort_services",
+    "hapimag_get_pet_charge",
+    # Maps tools
+    "maps_search_nearby_places",
+    "maps_get_places_details",
+    # Registry
     "get_all_tools",
 ]

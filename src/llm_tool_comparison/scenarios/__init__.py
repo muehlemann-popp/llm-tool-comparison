@@ -1,5 +1,19 @@
 """Scenarios module for testing different use cases."""
 
 from .travel import TRAVEL_QUERY, TRAVEL_SCENARIO_DESCRIPTION
+from .simple import SIMPLE_QUERY, SIMPLE_SCENARIO_DESCRIPTION
+from .resort import RESORT_QUERY, RESORT_SCENARIO_DESCRIPTION
+from .registry import Scenario, get_scenario, list_scenarios, DEFAULT_SCENARIO
 
-__all__ = ["TRAVEL_QUERY", "TRAVEL_SCENARIO_DESCRIPTION"]
+__all__ = [
+    "TRAVEL_QUERY",
+    "TRAVEL_SCENARIO_DESCRIPTION",
+    "SIMPLE_QUERY",
+    "SIMPLE_SCENARIO_DESCRIPTION",
+    "RESORT_QUERY",
+    "RESORT_SCENARIO_DESCRIPTION",
+    "Scenario",
+    "get_scenario",
+    "list_scenarios",
+    "DEFAULT_SCENARIO",
+]
