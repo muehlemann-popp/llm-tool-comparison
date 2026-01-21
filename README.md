@@ -4,291 +4,230 @@ A Python application to test and compare tool calling abilities of modern LLM mo
 
 ## Overview
 
-This system tests how different LLM models handle function calling / tool use by running a **Travel Research Assistant** scenario that requires multiple tool calls. The application displays formatted terminal output showing the dialogue, tool executions, and final responses for easy comparison.
+This system tests how different LLM models handle function calling / tool use by running various scenarios that require multiple tool calls. It includes a GPT-4.1 judge to evaluate response quality, and displays formatted terminal output showing the dialogue, tool executions, and final responses for easy comparison.
 
-### Tested Models
+### Supported Models
 
-- **GPT-4.1** (OpenAI)
-- **GPT-5.2** (OpenAI)
-- **Gemini 3 Flash** (Google Gemini 2.0 Flash)
-- **Gemini 3 Pro** (Google Gemini 2.0 Pro)
+| Model ID | Provider | Description |
+|----------|----------|-------------|
+| `gpt-4.1` | OpenAI | GPT-4.1 via Haystack |
+| `gpt-5.2` | OpenAI | GPT-5.2 via Haystack |
+| `gemini-native-flash` | Google | Gemini 3 Flash via native SDK |
+| `gemini-native-pro` | Google | Gemini 3 Pro via native SDK |
+| `gemini-haystack-flash` | Google | Gemini 3 Flash via Haystack |
+| `gemini-haystack-pro` | Google | Gemini 3 Pro via Haystack |
+| `gemini-agent-flash` | Google | Gemini 3 Flash via Haystack Agent |
+| `gemini-agent-pro` | Google | Gemini 3 Pro via Haystack Agent |
 
 ### Available Tools
 
-The system provides 5 mock tools with realistic data:
+The system provides 16 mock tools with realistic data:
 
-1. **Weather Forecast** - Get weather information for a location and month
-2. **Hotel Search** - Find hotels with price filtering and area preferences
-3. **Attractions Finder** - Discover tourist attractions by category
-4. **Currency Converter** - Convert between different currencies
-5. **Transportation Info** - Get airport and local transportation details
+**Travel Tools:**
+- `get_weather_forecast` - Weather information for a location and month
+- `search_hotels` - Find hotels with price filtering
+- `find_attractions` - Discover tourist attractions
+- `convert_currency` - Currency conversion
+- `get_transportation_info` - Airport and transport details
+
+**Hapimag Resort Tools:**
+- `hapimag_get_resort_details` - Resort information
+- `hapimag_get_resort_apartments` - Available apartments
+- `hapimag_get_charging_station_for_resort` - EV charging info
+- `hapimag_get_resort_gastronomy_details` - Dining options
+- `hapimag_get_activities_overview` - Activities list
+- `hapimag_get_activities_details` - Activity details
+- `hapimag_get_resort_services` - Resort services
+- `hapimag_get_pet_charge` - Pet policy and charges
+
+**Maps & Weather Tools:**
+- `maps_search_nearby_places` - Search nearby places
+- `maps_get_places_details` - Place details
+- `owm_daily_forecast` - OpenWeatherMap daily forecast
+
+### Available Scenarios
+
+| Scenario | Description |
+|----------|-------------|
+| `travel` | Travel planning to Tokyo (default) |
+| `simple` | Basic tool calling test |
+| `resort` | Hapimag resort amenities query with system prompt |
 
 ## Architecture
 
 ```
 Tech Stack:
 ├── Haystack         - LLM orchestration and tool calling
-├── LangFuse         - Observability and tracing (via OpenInference)
+├── google-genai     - Native Google Gemini SDK
+├── LangFuse         - Observability and tracing
 ├── Typer            - CLI interface
-├── Rich             - Terminal formatting and display
+├── Rich             - Terminal formatting
 └── Pydantic         - Settings management
 
 Project Structure:
-├── src/llm_tool_comparison/
-│   ├── config/          - Configuration and settings
-│   ├── tools/           - Mock tool implementations
-│   ├── providers/       - Model provider implementations
-│   ├── pipelines/       - Reusable pipeline builder
-│   ├── display/         - Rich terminal formatting
-│   └── scenarios/       - Test scenarios
+src/llm_tool_comparison/
+├── config/          - Configuration and settings
+├── tools/           - Mock tool implementations
+│   ├── weather.py, hotels.py, ...  (travel tools)
+│   ├── hapimag.py   (resort tools)
+│   ├── maps.py      (maps tools)
+│   └── openweathermap.py
+├── providers/
+│   ├── base.py                    - ModelProvider ABC
+│   ├── openai_provider.py         - OpenAI via Haystack
+│   ├── google_native_provider.py  - Gemini via native SDK
+│   ├── google_haystack_provider.py - Gemini via Haystack
+│   ├── google_agent_provider.py   - Gemini via Haystack Agent
+│   └── judge_provider.py          - GPT-4.1 judge
+├── pipelines/       - Reusable pipeline builder
+├── display/         - Rich terminal formatting
+└── scenarios/       - Test scenarios with system prompts
 ```
 
 ## Installation
 
 ### Prerequisites
 
-- Python 3.11 or higher
+- Python 3.11+
 - [uv](https://github.com/astral-sh/uv) package manager
-- API keys for:
-  - OpenAI
-  - Google AI (Gemini)
-  - LangFuse (for observability)
+- [Task](https://taskfile.dev/) (optional, for task automation)
+- API keys for OpenAI, Google AI, and LangFuse
 
 ### Setup
 
-1. **Clone or navigate to the project directory**
-
-2. **Run the setup task**
-
 ```bash
+# Clone the repository
+git clone https://github.com/muehlemann-popp/llm-tool-comparison.git
+cd llm-tool-comparison
+
+# Run setup
 task setup
+
+# Or manually:
+uv venv
+source .venv/bin/activate.fish  # or activate.sh for bash
+uv pip install -e .
+cp .env.example .env
 ```
 
-This will:
-- Create a virtual environment
-- Install dependencies
-- Copy `.env.example` to `.env`
-
-3. **Configure environment variables**
-
-Edit `.env` and add your API keys:
+Configure `.env` with your API keys:
 
 ```bash
-# LangFuse
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
 LANGFUSE_BASE_URL=https://cloud.langfuse.com
-
-# OpenAI
 OPENAI_API_KEY=sk-...
-
-# Google Gemini
 GOOGLE_API_KEY=...
-```
-
-4. **Test connections**
-
-```bash
-source .venv/bin/activate.fish
-python -m llm_tool_comparison.main test-connection
+JUDGE_ENABLED=true
+JUDGE_MODEL=gpt-4.1
 ```
 
 ## Usage
 
 ### Run Comparison
 
-Compare all models with the default Travel Research Assistant scenario:
-
 ```bash
-task run
+# Compare default models with travel scenario
+uv run python -m src.llm_tool_comparison.main compare
+
+# Compare specific models
+uv run python -m src.llm_tool_comparison.main compare -m gemini-native-pro -m gpt-4.1
+
+# Run resort scenario
+uv run python -m src.llm_tool_comparison.main compare -m gemini-native-pro -S resort
+
+# Show scenario description
+uv run python -m src.llm_tool_comparison.main compare -S resort --show-scenario
 ```
 
-Or activate the virtual environment and run directly:
+### Other Commands
 
 ```bash
-source .venv/bin/activate.fish
-python -m llm_tool_comparison.main compare
+# View available models and tools
+uv run python -m src.llm_tool_comparison.main info
+
+# Test API connections
+uv run python -m src.llm_tool_comparison.main test-connection
 ```
-
-### Select Specific Models
-
-Compare only specific models:
-
-```bash
-python -m llm_tool_comparison.main compare -m gpt-4.1 -m gemini-3-flash
-```
-
-### Show Scenario Details
-
-Display the scenario description before running:
-
-```bash
-python -m llm_tool_comparison.main compare --show-scenario
-```
-
-### View Available Models and Tools
-
-```bash
-python -m llm_tool_comparison.main info
-```
-
-## Test Scenario: Travel Research Assistant
-
-**User Query:**
-> "I'm planning a 5-day trip to Tokyo in April. Can you help me plan this? I need to know the weather, find good hotels under $200/night near Shibuya, and suggest a 3-day itinerary."
-
-**Expected Behavior:**
-The model should:
-1. Call `get_weather_forecast` for Tokyo in April
-2. Call `search_hotels` for Shibuya area under $200
-3. Call `find_attractions` for Tokyo
-4. Optionally call `convert_currency` for USD to JPY
-5. Optionally call `get_transportation_info` for Tokyo
-6. Synthesize all information into a coherent travel plan
 
 ## Output
 
 The system provides rich terminal output including:
 
-- **Model Header** - Clearly shows which model is being tested
+- **Model Header** - Shows which model is being tested
 - **User Query Panel** - Displays the original question
-- **Tool Calls Tables** - Shows each tool call with parameters
-- **Tool Results** - Displays the data returned by each tool
-- **Final Response** - The assistant's synthesized answer (rendered as Markdown)
+- **Tool Calls Tables** - Shows each tool call with parameters and results
+- **Final Response** - The assistant's synthesized answer (Markdown)
 - **Execution Summary** - Duration, success status, tool count
+- **Judge Evaluation** - Quality score (0-100) with detailed feedback
 - **Comparison Table** - Side-by-side comparison of all models
+
+## Judge Evaluation
+
+When enabled, responses are evaluated by GPT-4.1 on four criteria:
+- **Completeness** (25 pts) - All aspects of the query addressed
+- **Tool Usage** (25 pts) - Appropriate and efficient tool use
+- **Clarity** (25 pts) - Clear and well-organized response
+- **Actionability** (25 pts) - Practical, actionable information
 
 ## LangFuse Integration
 
-All pipeline operations are automatically traced to LangFuse using OpenInference instrumentation:
-
-- **Automatic Tracing** - No manual instrumentation needed
-- **Tool Call Tracking** - All tool invocations are logged
-- **LLM Generations** - Model interactions are captured
-- **Performance Metrics** - Duration and success rates tracked
+All operations are automatically traced to LangFuse:
+- Tool invocations and results
+- LLM generations and responses
+- Performance metrics and durations
 
 View traces at: https://cloud.langfuse.com
 
 ## Development
 
-### Project Structure
-
-```
-260120_gemini_tool_calling/
-├── src/llm_tool_comparison/
-│   ├── config/
-│   │   └── settings.py              # Pydantic settings
-│   ├── tools/
-│   │   ├── weather.py               # Weather tool + mock data
-│   │   ├── hotels.py                # Hotel search tool
-│   │   ├── attractions.py           # Attractions finder
-│   │   ├── currency.py              # Currency converter
-│   │   └── transportation.py        # Transport info
-│   ├── providers/
-│   │   ├── base.py                  # ModelProvider ABC
-│   │   ├── openai_provider.py       # OpenAI implementation
-│   │   └── google_provider.py       # Google Gemini implementation
-│   ├── pipelines/
-│   │   └── builder.py               # Pipeline builder
-│   ├── display/
-│   │   └── logger.py                # Rich formatting
-│   ├── scenarios/
-│   │   └── travel.py                # Travel scenario
-│   └── main.py                      # CLI entry point
-├── pyproject.toml                   # Dependencies
-├── taskfile.yml                     # Task automation
-└── README.md                        # This file
-```
-
 ### Adding New Tools
 
-1. Create a new file in `src/llm_tool_comparison/tools/`
-2. Define mock data for reproducibility
-3. Implement a Haystack component with `@component` decorator
-4. Add the tool to `get_all_tools()` in `tools/__init__.py`
-
-Example:
+1. Create a tool file in `src/llm_tool_comparison/tools/`
+2. Define the function and create a Haystack `Tool`
+3. Export in `tools/__init__.py`
 
 ```python
-from haystack import component
-from typing import Dict
+from haystack.tools import Tool
 
-MOCK_DATA = {"key": "value"}
+def my_tool(param: str) -> str:
+    """Tool description."""
+    return f"Result for {param}"
 
-@component
-class MyTool:
-    @component.output_types(result=Dict)
-    def run(self, param: str) -> Dict:
-        """Tool description."""
-        return {"result": MOCK_DATA.get(param, {})}
+my_tool_def = Tool(
+    name="my_tool",
+    description="Does something useful",
+    function=my_tool,
+    parameters={
+        "type": "object",
+        "properties": {"param": {"type": "string"}},
+        "required": ["param"]
+    }
+)
 ```
 
 ### Adding New Scenarios
 
-1. Create a new file in `src/llm_tool_comparison/scenarios/`
-2. Define the query and description
-3. Import and use in `main.py`
+1. Create a scenario file in `src/llm_tool_comparison/scenarios/`
+2. Register in `scenarios/registry.py`
 
-### Adding New Model Providers
+```python
+# scenarios/my_scenario.py
+MY_QUERY = "User question here"
+MY_DESCRIPTION = "Scenario description"
+MY_SYSTEM_PROMPT = "Optional system prompt"
+```
 
-1. Create a new provider file in `src/llm_tool_comparison/providers/`
+### Adding New Providers
+
+1. Create a provider in `src/llm_tool_comparison/providers/`
 2. Inherit from `ModelProvider`
-3. Implement `get_model_name()` and `run_conversation()`
-4. Add provider logic to `main.py`
-
-## Key Design Decisions
-
-✅ **Mock Data** - All tools use hardcoded data for reproducible testing
-✅ **Sequential Execution** - Models run one at a time for clear output
-✅ **Reusable Pipeline** - Same architecture works for all providers
-✅ **OpenInference** - Automatic LangFuse integration
-✅ **Rich Formatting** - Professional terminal output
-
-## Troubleshooting
-
-### Connection Errors
-
-Run the connection test:
-
-```bash
-python -m llm_tool_comparison.main test-connection
-```
-
-### API Key Issues
-
-- Ensure `.env` file exists and contains valid keys
-- OpenAI keys should start with `sk-`
-- LangFuse keys should start with `pk-lf-` and `sk-lf-`
-
-### Import Errors
-
-Reinstall dependencies:
-
-```bash
-source .venv/bin/activate.fish
-uv pip install -e .
-```
-
-### Tool Calling Not Working
-
-- Check that tools are properly registered in `tools/__init__.py`
-- Verify the pipeline builder connects components correctly
-- Check LangFuse traces for detailed execution logs
+3. Implement `get_model_name()` and `run_conversation(query, system_prompt)`
 
 ## License
 
-MIT License - See LICENSE file for details
+MIT License
 
 ## Contributing
 
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## Contact
-
-For questions or issues, please open an issue on GitHub.
+Contributions welcome! Please fork, create a feature branch, and submit a PR.
