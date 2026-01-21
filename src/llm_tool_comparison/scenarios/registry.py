@@ -5,15 +5,16 @@ from typing import Dict
 
 from .travel import TRAVEL_QUERY, TRAVEL_SCENARIO_DESCRIPTION
 from .simple import SIMPLE_QUERY, SIMPLE_SCENARIO_DESCRIPTION
-from .resort import RESORT_QUERY, RESORT_SCENARIO_DESCRIPTION
+from .resort import RESORT_QUERY, RESORT_SCENARIO_DESCRIPTION, RESORT_SYSTEM_PROMPT
 
 
 @dataclass
 class Scenario:
-    """A test scenario with query and description."""
+    """A test scenario with query, description, and optional system prompt."""
     name: str
     query: str
     description: str
+    system_prompt: str = ""
 
 
 SCENARIOS: Dict[str, Scenario] = {
@@ -31,6 +32,7 @@ SCENARIOS: Dict[str, Scenario] = {
         name="resort",
         query=RESORT_QUERY,
         description=RESORT_SCENARIO_DESCRIPTION,
+        system_prompt=RESORT_SYSTEM_PROMPT,
     ),
 }
 

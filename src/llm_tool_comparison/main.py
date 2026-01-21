@@ -9,9 +9,10 @@ from .config.settings import settings
 from .providers.openai_provider import OpenAIProvider
 from .providers.google_native_provider import GoogleNativeProvider
 from .providers.google_haystack_provider import GoogleHaystackProvider
+from .providers.google_agent_provider import GoogleAgentProvider
 from .providers.judge_provider import JudgeProvider
 from .display.logger import ConversationLogger
-from .scenarios.travel import TRAVEL_QUERY, TRAVEL_SCENARIO_DESCRIPTION
+from .scenarios import get_scenario, list_scenarios, DEFAULT_SCENARIO
 from .tools import get_all_tools
 
 app = typer.Typer(
@@ -28,10 +29,16 @@ if settings.langfuse_enabled:
 @app.command()
 def compare(
     models: List[str] = typer.Option(
-        ["gpt-4.1", "gemini-native-flash", "gemini-haystack-flash"],
+        ["gpt-4.1", "gemini-native-flash", "gemini-haystack-flash", "gemini-agent-flash"],
         "--model",
         "-m",
-        help="Models to compare. Gemini variants: gemini-native-flash, gemini-native-pro (native SDK), gemini-haystack-flash, gemini-haystack-pro (Haystack)"
+        help="Models to compare. Gemini variants: gemini-native-*, gemini-haystack-*, gemini-agent-* (flash/pro)"
+    ),
+    scenario: str = typer.Option(
+        DEFAULT_SCENARIO,
+        "--scenario",
+        "-S",
+        help="Scenario to run (travel, simple)"
     ),
     show_scenario: bool = typer.Option(
         False,
@@ -42,14 +49,20 @@ def compare(
 ):
     """Compare tool calling across different LLM models.
 
-    This command runs the Travel Research Assistant scenario with each
-    specified model and displays formatted results with tool calls and
-    final responses.
+    This command runs a scenario with each specified model and displays
+    formatted results with tool calls and final responses.
 
     Example:
-        llm-tool-comparison compare -m gpt-4.1 -m gemini-3-flash
+        llm-tool-comparison compare -m gpt-4.1 -S simple
     """
     logger = ConversationLogger()
+
+    # Get the scenario
+    try:
+        current_scenario = get_scenario(scenario)
+    except ValueError as e:
+        logger.show_error(str(e))
+        raise typer.Exit(1)
 
     # Initialize LangFuse client if enabled
     langfuse = None
@@ -73,7 +86,7 @@ def compare(
 
     # Show scenario description if requested
     if show_scenario:
-        logger.console.print(TRAVEL_SCENARIO_DESCRIPTION)
+        logger.console.print(current_scenario.description)
         logger.console.print()
 
     results = []
@@ -88,23 +101,28 @@ def compare(
                 provider = GoogleNativeProvider(model_name)
             elif model_name.startswith("gemini-haystack"):
                 provider = GoogleHaystackProvider(model_name)
+            elif model_name.startswith("gemini-agent"):
+                provider = GoogleAgentProvider(model_name)
             else:
                 logger.show_error(f"Unknown model type: {model_name}. Use gemini-native-* or gemini-haystack-* for Gemini models.")
                 continue
 
             # Display header
             logger.show_model_header(model_name)
-            logger.show_user_message(TRAVEL_QUERY)
+            logger.show_user_message(current_scenario.query)
 
             # Run conversation
-            result = provider.run_conversation(TRAVEL_QUERY)
+            result = provider.run_conversation(
+                current_scenario.query,
+                system_prompt=current_scenario.system_prompt
+            )
 
             # Judge evaluation
             if settings.judge_enabled and result.success:
                 judge = JudgeProvider(model_name=settings.judge_model)
                 result = judge.evaluate_response(
                     result,
-                    TRAVEL_QUERY,
+                    current_scenario.query,
                     get_all_tools()
                 )
 
@@ -158,6 +176,8 @@ def info():
         ("gemini-native-pro", "Gemini 3 Pro (native)", "Native google-genai SDK"),
         ("gemini-haystack-flash", "Gemini 3 Flash (Haystack)", "Via Haystack integration"),
         ("gemini-haystack-pro", "Gemini 3 Pro (Haystack)", "Via Haystack integration"),
+        ("gemini-agent-flash", "Gemini 3 Flash (Agent)", "Via Haystack Agent component"),
+        ("gemini-agent-pro", "Gemini 3 Pro (Agent)", "Via Haystack Agent component"),
     ]
 
     for model_id, display_name, description in models_info:

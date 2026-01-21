@@ -12,7 +12,7 @@ tasks:
   run:
     desc: Run the comparison
     cmds:
-      - .venv/bin/python -m llm_tool_comparison.main compare
+      - .venv/bin/python -m llm_tool_comparison.main compare {{.CLI_ARGS}}
 
   test-connection:
     desc: Test API connections

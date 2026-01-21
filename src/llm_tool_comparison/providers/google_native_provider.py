@@ -45,11 +45,12 @@ class GoogleNativeProvider(ModelProvider):
         """Get the model name."""
         return self.model_name
 
-    def run_conversation(self, query: str) -> ConversationResult:
+    def run_conversation(self, query: str, system_prompt: str = "") -> ConversationResult:
         """Run conversation with tool calling.
 
         Args:
             query: User's question
+            system_prompt: Optional system prompt to set context
 
         Returns:
             ConversationResult with final response and metadata
@@ -86,6 +87,7 @@ class GoogleNativeProvider(ModelProvider):
                     config=types.GenerateContentConfig(
                         tools=[self._tool_declarations],
                         temperature=0.7,
+                        system_instruction=system_prompt if system_prompt else None,
                     ),
                 )
 

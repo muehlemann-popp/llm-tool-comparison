@@ -57,16 +57,17 @@ class ModelProvider(ABC):
         pass
 
     @abstractmethod
-    def run_conversation(self, query: str) -> ConversationResult:
+    def run_conversation(self, query: str, system_prompt: str = "") -> ConversationResult:
         """Run a conversation with the user query.
 
         The implementation should:
-        1. Send the query to the LLM
+        1. Send the query to the LLM (with optional system prompt)
         2. Handle any tool calls iteratively
         3. Return the final result with metadata
 
         Args:
             query: User's question/request
+            system_prompt: Optional system prompt to set context
 
         Returns:
             ConversationResult with response and metadata
